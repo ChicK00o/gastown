@@ -71,6 +71,10 @@ func DefaultBdCli() *BdCli {
 	}
 }
 
+// defaultBdProvider returns the BdCli used by standalone functions like
+// IsBeadActivelyWorked. Tests override this to avoid shelling out to bd.
+var defaultBdProvider = func() *BdCli { return DefaultBdCli() }
+
 // hasSession checks if a tmux session exists. Tests override this to avoid
 // requiring a live tmux server.
 var hasSession = func(sessionName string) (bool, error) {
@@ -1815,7 +1819,7 @@ func IsBeadActivelyWorked(workDir, rigName, beadID, excludePolecat string) bool 
 		// Check if this polecat has our bead hooked
 		prefix := beads.GetPrefixForRig(townRoot, rigName)
 		agentBeadID := beads.PolecatBeadIDWithPrefix(prefix, rigName, polecatName)
-		_, hookBead := getAgentBeadState(DefaultBdCli(), workDir, agentBeadID)
+_, hookBead := getAgentBeadState(defaultBdProvider(), workDir, agentBeadID)
 		if hookBead != beadID {
 			continue
 		}

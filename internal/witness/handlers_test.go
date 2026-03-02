@@ -1562,6 +1562,16 @@ func TestClearCompletionMetadata_NoBd(t *testing.T) {
 	}
 }
 
+// installMockBd replaces the defaultBdProvider package variable with a mock BdCli.
+// This allows IsBeadActivelyWorked and other standalone functions to use a test double.
+func installMockBd(t *testing.T, execFn func(args []string) (string, error), runFn func(args []string) error) {
+	t.Helper()
+	old := defaultBdProvider
+	bd, _ := mockBd(execFn, runFn)
+	defaultBdProvider = func() *BdCli { return bd }
+	t.Cleanup(func() { defaultBdProvider = old })
+}
+
 // installMockHasSession replaces the hasSession package variable with a mock.
 // The mockFn receives a session name and returns (alive, error).
 func installMockHasSession(t *testing.T, mockFn func(sessionName string) (bool, error)) {
@@ -1797,7 +1807,7 @@ func TestResetAbandonedBead_SkipsWhenBeadActivelyWorked(t *testing.T) {
 	})
 
 	// alpha is dead, bravo is alive with same bead — should NOT reset
-	result := resetAbandonedBead(townRoot, rigName, "gt-TARGET", "alpha", nil)
+	result := resetAbandonedBead(defaultBdProvider(), townRoot, rigName, "gt-TARGET", "alpha", nil)
 	if result {
 		t.Error("resetAbandonedBead should return false when another live polecat has the bead")
 	}
