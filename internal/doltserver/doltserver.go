@@ -2276,6 +2276,19 @@ func EnsureMetadata(townRoot, rigName string) error {
 		existing["dolt_database"] = rigName
 	}
 
+	// Set dolt_server_host and dolt_server_port so beads knows which server to connect to.
+	// Without these, beads falls back to a computed port which may not match the actual server.
+	cfg := DefaultConfig(townRoot)
+	if existing["dolt_server_host"] == nil || existing["dolt_server_host"] == "" {
+		existing["dolt_server_host"] = cfg.Host
+		if existing["dolt_server_host"] == "" {
+			existing["dolt_server_host"] = "127.0.0.1"
+		}
+	}
+	if existing["dolt_server_port"] == nil || existing["dolt_server_port"] == 0 {
+		existing["dolt_server_port"] = cfg.Port
+	}
+
 	data, err := json.MarshalIndent(existing, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshaling metadata: %w", err)
