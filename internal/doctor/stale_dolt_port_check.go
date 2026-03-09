@@ -1,6 +1,7 @@
 package doctor
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,14 +12,22 @@ import (
 // StaleDoltPortCheck detects stale Dolt port files that point to wrong ports.
 // This can cause bd commands to fail with "database not found" errors when
 // they connect to the wrong Dolt server.
+// It also checks metadata.json files for port consistency with the running server.
 type StaleDoltPortCheck struct {
 	FixableCheck
-	stalePorts []stalePortInfo
+	stalePorts      []stalePortInfo
+	staleMetadata   []staleMetadataInfo
 }
 
 type stalePortInfo struct {
-	path      string
-	port      int
+	path       string
+	port       int
+	correctPort int
+}
+
+type staleMetadataInfo struct {
+	path       string
+	port       int
 	correctPort int
 }
 
@@ -35,9 +44,10 @@ func NewStaleDoltPortCheck() *StaleDoltPortCheck {
 	}
 }
 
-// Run checks for stale Dolt port files.
+// Run checks for stale Dolt port files and metadata.json port consistency.
 func (c *StaleDoltPortCheck) Run(ctx *CheckContext) *CheckResult {
 	c.stalePorts = nil
+	c.staleMetadata = nil
 	
 	// Get the correct port from the main Dolt config
 	correctPort := c.getCorrectPort(ctx)
@@ -73,6 +83,21 @@ func (c *StaleDoltPortCheck) Run(ctx *CheckContext) *CheckResult {
 		}
 	}
 
+	// Check metadata.json files for port consistency
+	metadataFiles := c.findMetadataFiles(ctx.TownRoot)
+	for _, metaFile := range metadataFiles {
+		port := c.getPortFromMetadata(metaFile)
+		if port > 0 && port != correctPort {
+			c.staleMetadata = append(c.staleMetadata, staleMetadataInfo{
+				path:       metaFile,
+				port:       port,
+				correctPort: correctPort,
+			})
+			relPath, _ := filepath.Rel(ctx.TownRoot, metaFile)
+			details = append(details, fmt.Sprintf("metadata.json %s has port %d (should be %d)", relPath, port, correctPort))
+		}
+	}
+
 	// Also check for stale dolt config directories with wrong ports
 	staleConfigs := c.findStaleDoltConfigs(ctx.TownRoot, correctPort)
 	for _, config := range staleConfigs {
@@ -80,7 +105,7 @@ func (c *StaleDoltPortCheck) Run(ctx *CheckContext) *CheckResult {
 		details = append(details, fmt.Sprintf("Stale Dolt config directory: %s (contains wrong port configuration)", relPath))
 	}
 
-	if len(c.stalePorts) == 0 && len(staleConfigs) == 0 {
+	if len(c.stalePorts) == 0 && len(c.staleMetadata) == 0 && len(staleConfigs) == 0 {
 		return &CheckResult{
 			Name:    c.Name(),
 			Status:  StatusOK,
@@ -91,19 +116,28 @@ func (c *StaleDoltPortCheck) Run(ctx *CheckContext) *CheckResult {
 	return &CheckResult{
 		Name:    c.Name(),
 		Status:  StatusWarning,
-		Message: fmt.Sprintf("%d stale Dolt port file(s), %d stale config dir(s)", len(c.stalePorts), len(staleConfigs)),
+		Message: fmt.Sprintf("%d stale port file(s), %d stale metadata.json(s), %d stale config dir(s)", len(c.stalePorts), len(c.staleMetadata), len(staleConfigs)),
 		Details: details,
-		FixHint: "Run 'gt doctor --fix' to remove stale port files and config directories",
+		FixHint: "Run 'gt doctor --fix' to fix port inconsistencies",
 	}
 }
 
-// Fix removes stale Dolt port files and config directories.
+// Fix removes stale Dolt port files and fixes metadata.json port mismatches.
 func (c *StaleDoltPortCheck) Fix(ctx *CheckContext) error {
+	// Remove stale port files
 	for _, info := range c.stalePorts {
 		if err := os.Remove(info.path); err != nil {
 			return fmt.Errorf("could not remove stale port file %s: %w", info.path, err)
 		}
 	}
+	
+	// Fix metadata.json files with wrong ports
+	for _, info := range c.staleMetadata {
+		if err := c.fixMetadataPort(info.path, info.correctPort); err != nil {
+			return fmt.Errorf("could not fix metadata.json %s: %w", info.path, err)
+		}
+	}
+	
 	return nil
 }
 
@@ -183,11 +217,83 @@ func (c *StaleDoltPortCheck) findStaleDoltConfigs(townRoot string, correctPort i
 		// Check if it has a config.yaml with wrong port
 		configPath := filepath.Join(staleDir, "config.yaml")
 		if data, err := os.ReadFile(configPath); err == nil {
-			if strings.Contains(string(data), fmt.Sprintf("port: %d", 13761)) {
+			// Check for any port that's not the correct port
+			if strings.Contains(string(data), "port:") && !strings.Contains(string(data), fmt.Sprintf("port: %d", correctPort)) {
 				staleConfigs = append(staleConfigs, staleDir)
 			}
 		}
 	}
 
 	return staleConfigs
+}
+
+// findMetadataFiles finds all metadata.json files that might contain Dolt port config.
+func (c *StaleDoltPortCheck) findMetadataFiles(townRoot string) []string {
+	var files []string
+
+	// Town root metadata
+	townMeta := filepath.Join(townRoot, ".beads", "metadata.json")
+	if _, err := os.Stat(townMeta); err == nil {
+		files = append(files, townMeta)
+	}
+
+	// Rig metadata files
+	rigsConfig := filepath.Join(townRoot, "mayor", "rigs.json")
+	if data, err := os.ReadFile(rigsConfig); err == nil {
+		var rigs struct {
+			Rigs map[string]struct{} `json:"rigs"`
+		}
+		if json.Unmarshal(data, &rigs) == nil {
+			for rigName := range rigs.Rigs {
+				rigMeta := filepath.Join(townRoot, rigName, "mayor", "rig", ".beads", "metadata.json")
+				if _, err := os.Stat(rigMeta); err == nil {
+					files = append(files, rigMeta)
+				}
+			}
+		}
+	}
+
+	return files
+}
+
+// getPortFromMetadata reads the dolt_server_port from a metadata.json file.
+func (c *StaleDoltPortCheck) getPortFromMetadata(path string) int {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0
+	}
+
+	var metadata struct {
+		DoltServerPort int `json:"dolt_server_port"`
+	}
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return 0
+	}
+
+	return metadata.DoltServerPort
+}
+
+// fixMetadataPort updates the dolt_server_port in a metadata.json file.
+func (c *StaleDoltPortCheck) fixMetadataPort(path string, correctPort int) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	// Parse as generic map to preserve all fields
+	var metadata map[string]interface{}
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return err
+	}
+
+	// Update the port
+	metadata["dolt_server_port"] = correctPort
+
+	// Write back
+	newData, err := json.MarshalIndent(metadata, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(path, newData, 0644)
 }
