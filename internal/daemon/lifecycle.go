@@ -998,8 +998,21 @@ func mergeAgentBeadJSON(wispJSON, issuesJSON []byte) []byte {
 // progressing. This is a GUPP violation: agents with hooked work must execute.
 // The daemon detects these and notifies the relevant Witness for remediation.
 func (d *Daemon) checkGUPPViolations() {
-	// Check polecat agents - they're the ones with work-on-hook
+	// Check if any rigs are operational before querying agent beads
 	rigs := d.getKnownRigs()
+	hasOperationalRig := false
+	for _, rigName := range rigs {
+		if operational, _ := d.isRigOperational(rigName); operational {
+			hasOperationalRig = true
+			break
+		}
+	}
+
+	// Skip entirely if no rigs are operational (all docked/parked)
+	if !hasOperationalRig {
+		return
+	}
+
 	for _, rigName := range rigs {
 		d.checkRigGUPPViolations(rigName)
 	}
@@ -1020,6 +1033,7 @@ func (d *Daemon) checkRigGUPPViolations(rigName string) {
 	}
 
 	if err := d.listAgentBeadsJSON(&agents); err != nil {
+		// Suppress warning when there are simply no agent beads (expected when all rigs are docked)
 		d.logger.Printf("Warning: listing agent beads failed for GUPP check: %v", err)
 		return
 	}
@@ -1092,8 +1106,21 @@ Action needed: Check if agent is alive and responsive. Consider restarting if st
 // Orphaned work needs to be reassigned or the agent needs to be restarted.
 // Per gt-zecmc: derive agent liveness from tmux, not agent_state.
 func (d *Daemon) checkOrphanedWork() {
-	// Check all polecat agents with hooked work
+	// Check if any rigs are operational before querying agent beads
 	rigs := d.getKnownRigs()
+	hasOperationalRig := false
+	for _, rigName := range rigs {
+		if operational, _ := d.isRigOperational(rigName); operational {
+			hasOperationalRig = true
+			break
+		}
+	}
+
+	// Skip entirely if no rigs are operational (all docked/parked)
+	if !hasOperationalRig {
+		return
+	}
+
 	for _, rigName := range rigs {
 		d.checkRigOrphanedWork(rigName)
 	}
