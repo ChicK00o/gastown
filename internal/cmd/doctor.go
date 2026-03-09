@@ -180,6 +180,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	d.Register(doctor.NewFormulaCheck())
 	d.Register(doctor.NewPrefixConflictCheck())
 	d.Register(doctor.NewRigNameMismatchCheck())
+	d.Register(doctor.NewRigConfigSyncCheck()) // Check all registered rigs have config.json
 	d.Register(doctor.NewPrefixMismatchCheck())
 	d.Register(doctor.NewDatabasePrefixCheck())
 	d.Register(doctor.NewRoutesCheck())
@@ -194,6 +195,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	d.Register(doctor.NewCheckJSONLBloat())
 	d.Register(doctor.NewStaleBeadsRedirectCheck())
 	d.Register(doctor.NewBeadsRedirectTargetCheck())
+	d.Register(doctor.NewStaleRuntimeFilesCheck())
 	d.Register(doctor.NewBranchCheck())
 	d.Register(doctor.NewCloneDivergenceCheck())
 	d.Register(doctor.NewDefaultBranchAllRigsCheck())
