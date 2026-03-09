@@ -10,6 +10,7 @@ import (
 
 	"github.com/steveyegge/gastown/internal/beads"
 	"github.com/steveyegge/gastown/internal/config"
+	"github.com/steveyegge/gastown/internal/doltserver"
 	"github.com/steveyegge/gastown/internal/rig"
 )
 
@@ -320,16 +321,18 @@ func (c *RigConfigSyncCheck) Fix(ctx *CheckContext) error {
 
 // doltDatabaseExists checks if a Dolt database exists on the server.
 func (c *RigConfigSyncCheck) doltDatabaseExists(ctx *CheckContext, dbName string) bool {
-	// Check by trying to use bd dolt status
-	cmd := exec.Command("bd", "dolt", "status", "--json")
-	cmd.Dir = ctx.TownRoot
-	output, err := cmd.CombinedOutput()
+	// Use the doltserver package to list databases
+	databases, err := doltserver.ListDatabases(ctx.TownRoot)
 	if err != nil {
 		return false
 	}
 
-	// Check if database name appears in the output
-	return strings.Contains(string(output), dbName)
+	for _, db := range databases {
+		if db == dbName {
+			return true
+		}
+	}
+	return false
 }
 
 // rigBeadExists checks if a rig identity bead exists.
