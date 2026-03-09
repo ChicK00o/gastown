@@ -1458,6 +1458,10 @@ func (d *Daemon) isRigOperational(rigName string) (bool, string) {
 				return false, "rig is parked (global)"
 			}
 		}
+	} else {
+		// Log when rig bead lookup fails - this helps debug transient Dolt issues
+		// We still return true (operational) as the default since most rigs are operational
+		d.logger.Printf("Warning: failed to check rig bead %s for docked/parked status: %v", rigBeadID, err)
 	}
 
 	// Check auto_restart config
