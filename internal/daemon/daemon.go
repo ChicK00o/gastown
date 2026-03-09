@@ -20,6 +20,7 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 	"github.com/steveyegge/gastown/internal/beads"
 	"github.com/steveyegge/gastown/internal/boot"
+	"github.com/steveyegge/gastown/internal/config"
 	"github.com/steveyegge/gastown/internal/constants"
 	"github.com/steveyegge/gastown/internal/deacon"
 	"github.com/steveyegge/gastown/internal/doltserver"
@@ -1435,18 +1436,26 @@ func (d *Daemon) isRigOperational(rigName string) (bool, string) {
 	// Check rig bead labels (global/synced docked status)
 	// This is the persistent docked state set by 'gt rig dock'
 	rigPath := filepath.Join(d.config.TownRoot, rigName)
+	
+	// Try to get prefix from rig config.json, fall back to rigs.json registry
+	var prefix string
 	if rigCfg, err := rig.LoadRigConfig(rigPath); err == nil && rigCfg.Beads != nil {
-		rigBeadID := fmt.Sprintf("%s-rig-%s", rigCfg.Beads.Prefix, rigName)
-		rigBeadsDir := beads.ResolveBeadsDir(rigPath)
-		bd := beads.NewWithBeadsDir(rigPath, rigBeadsDir)
-		if issue, err := bd.Show(rigBeadID); err == nil {
-			for _, label := range issue.Labels {
-				if label == "status:docked" {
-					return false, "rig is docked (global)"
-				}
-				if label == "status:parked" {
-					return false, "rig is parked (global)"
-				}
+		prefix = rigCfg.Beads.Prefix
+	} else {
+		// Fall back to registry (mayor/rigs.json) when config.json is missing
+		prefix = config.GetRigPrefix(d.config.TownRoot, rigName)
+	}
+	
+	rigBeadID := fmt.Sprintf("%s-rig-%s", prefix, rigName)
+	rigBeadsDir := beads.ResolveBeadsDir(rigPath)
+	bd := beads.NewWithBeadsDir(rigPath, rigBeadsDir)
+	if issue, err := bd.Show(rigBeadID); err == nil {
+		for _, label := range issue.Labels {
+			if label == "status:docked" {
+				return false, "rig is docked (global)"
+			}
+			if label == "status:parked" {
+				return false, "rig is parked (global)"
 			}
 		}
 	}
