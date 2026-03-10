@@ -198,7 +198,7 @@ func (c *RigConfigSyncCheck) Run(ctx *CheckContext) *CheckResult {
 		// Check if rig identity bead exists
 		if configPrefix != "" {
 			rigBeadID := fmt.Sprintf("%s-rig-%s", configPrefix, rigName)
-			if !c.rigBeadExists(ctx, rigBeadID, rigPath) {
+			if !c.rigBeadExists(rigBeadID, rigPath) {
 				c.missingRigBeads = append(c.missingRigBeads, rigBeadInfo{
 					rigName: rigName,
 					prefix:  configPrefix,
@@ -426,7 +426,7 @@ func (c *RigConfigSyncCheck) Fix(ctx *CheckContext) error {
 		rigBeadID := fmt.Sprintf("%s-rig-%s", info.prefix, info.rigName)
 		cmd := exec.Command("bd", "label", rigBeadID, "--add", "status:docked")
 		cmd.Dir = mayorRigPath
-		cmd.Run() // Best effort
+		_ = cmd.Run() // Best effort - ignore errors
 	}
 
 	return nil
@@ -449,7 +449,7 @@ func (c *RigConfigSyncCheck) doltDatabaseExists(ctx *CheckContext, dbName string
 }
 
 // rigBeadExists checks if a rig identity bead exists.
-func (c *RigConfigSyncCheck) rigBeadExists(ctx *CheckContext, rigBeadID, rigPath string) bool {
+func (c *RigConfigSyncCheck) rigBeadExists(rigBeadID, rigPath string) bool {
 	mayorRigPath := filepath.Join(rigPath, "mayor", "rig")
 
 	// Try to show the bead using bd
