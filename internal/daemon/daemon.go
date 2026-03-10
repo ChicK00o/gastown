@@ -1460,8 +1460,11 @@ func (d *Daemon) isRigOperational(rigName string) (bool, string) {
 		}
 	} else {
 		// Log when rig bead lookup fails - this helps debug transient Dolt issues
-		// We still return true (operational) as the default since most rigs are operational
-		d.logger.Printf("Warning: failed to check rig bead %s for docked/parked status: %v", rigBeadID, err)
+		// FAIL-SAFE: When we can't verify docked status (Dolt down, network issue, etc.),
+		// assume the rig is NOT operational. This prevents wasting API credits starting
+		// witnesses that might be docked. Better to delay work than burn credits unnecessarily.
+		d.logger.Printf("Warning: failed to check rig bead %s for docked/parked status: %v (assuming not operational)", rigBeadID, err)
+		return false, "cannot verify rig status (Dolt unavailable)"
 	}
 
 	// Check auto_restart config
