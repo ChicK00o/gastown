@@ -5,7 +5,7 @@
 // Events mapped:
 //   session_start       → gt prime --hook (capture context)
 //   before_agent_start  → inject captured context into system prompt
-//   tool_call           → gt tap guard pr-workflow (on git push/pr create)
+//   tool_call           → gt tap guard pr-workflow (on gh pr create, git checkout -b, git switch -c)
 //   session_shutdown    → gt costs record
 //
 // Loaded via: pi -e gastown-hooks.js
@@ -62,14 +62,15 @@ export default (pi) => {
     }
   });
 
-  // PreToolUse equivalent — guard dangerous git operations
+  // PreToolUse equivalent — guard PR workflow (block PR creation and feature branches)
+  // Note: git push is NOT guarded here - agents push directly to main
   pi.on("tool_call", async (event, context) => {
     if (event.toolName === "bash" && event.input?.command) {
       const cmd = event.input.command;
       if (
-        cmd.includes("git push") ||
         cmd.includes("gh pr create") ||
-        cmd.includes("git checkout -b")
+        cmd.includes("git checkout -b") ||
+        cmd.includes("git switch -c")
       ) {
         try {
           const result = await pi.exec("gt", ["tap", "guard", "pr-workflow"]);
