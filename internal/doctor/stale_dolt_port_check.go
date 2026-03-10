@@ -187,7 +187,7 @@ func (c *StaleDoltPortCheck) findPortFiles(townRoot string) []string {
 	rigsDir := filepath.Join(townRoot, "mayor", "rigs.json")
 	if _, err := os.Stat(rigsDir); err == nil {
 		// Walk through directories looking for .beads/dolt-server.port
-		filepath.Walk(townRoot, func(path string, info os.FileInfo, err error) error {
+		_ = filepath.Walk(townRoot, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return nil
 			}
