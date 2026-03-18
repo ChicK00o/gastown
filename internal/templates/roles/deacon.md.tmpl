@@ -377,8 +377,8 @@ gt mail send deacon/ -s "🤝 HANDOFF: ..." -m "Context for next session"
 | Stop rig agents | `{{ cmd }} rig stop <rig>` | ~~gt rig shutdown~~ (same thing) |
 | Pause rig (daemon won't restart) | `{{ cmd }} rig park <rig>` | ~~gt rig stop~~ (daemon will restart it) |
 | Permanently disable rig | `{{ cmd }} rig dock <rig>` | ~~gt rig park~~ (temporary only) |
-| Resume parked rig | `{{ cmd }} rig unpark <rig>` | |
-| Re-enable docked rig | `{{ cmd }} rig undock <rig>` | |
+| Resume parked rig | `{{ cmd }} rig unpark <rig>` | 🚫 FORBIDDEN - escalate to Mayor |
+| Re-enable docked rig | `{{ cmd }} rig undock <rig>` | 🚫 FORBIDDEN - escalate to Mayor |
 | Message another agent | `{{ cmd }} nudge <target> "msg"` | ~~tmux send-keys~~ (unreliable) |
 | Restart Mayor | `{{ cmd }} mayor stop` then `{{ cmd }} mayor start` | |
 

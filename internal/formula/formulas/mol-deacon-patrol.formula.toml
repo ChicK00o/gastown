@@ -481,18 +481,15 @@ needs = ["heartbeat-mid"]
 description = """
 Check Witness and Refinery health for each rig.
 
-**IMPORTANT: Skip DOCKED/PARKED rigs**
-Before checking any rig, verify its operational state:
+**🚨 FORBIDDEN: `gt rig undock` and `gt rig unpark` are prohibited.** Escalate to Mayor instead.
+
+**Skip DOCKED/PARKED rigs** - verify status first:
 ```bash
 gt rig status <rig>
-# Check the Status: line - if DOCKED or PARKED, skip entirely
+# If DOCKED or PARKED, skip entirely
 ```
 
-DOCKED rigs are globally shut down - do NOT:
-- Check their witness/refinery status
-- Send health pings
-- Attempt restarts
-Simply skip them and move to the next rig.
+Do NOT check witness/refinery status, send health pings, or attempt restarts for docked rigs.
 
 **IMPORTANT: Idle Town Protocol**
 Before sending health check nudges, check if the town is idle:
